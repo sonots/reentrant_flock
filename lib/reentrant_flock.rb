@@ -91,6 +91,20 @@ class ReentrantFlock
   end
 end
 
+# There is a fact that
+#
+# ```
+# fp = File.open('a', 'w')
+# fp.flock(File::LOCK_EX)
+# fp.flock(File::LOCK_EX) # does not block
+# fp = File.open('a', 'w')
+# fp.flock(File::LOCK_EX) # block
+# ```
+#
+# That is, File#flock is orginally reentrant for the same
+# file object because its file descriptor has lock information
+# on kernel layer. So, this instance version, which holds an
+# instance of File, may not worth to be prepared.
 class ReentrantFlock
   attr_reader :fp
 
