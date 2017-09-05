@@ -50,7 +50,7 @@ class ReentrantFlock
     private
 
     # @return [0] if current thread holds the lock
-    # @return [false] if current thread holds the lock
+    # @return [false] if another already locked (LOCK_NB)
     def lock(fp, operation)
       c = incr(key(fp))
       if c <= 1
