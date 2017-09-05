@@ -1,8 +1,6 @@
 # ReentrantFlock
 
-Welcome to your new gem! In this directory, you'll find the files you need to be able to package up your Ruby library into a gem. Put your Ruby code in the file `lib/reentrant_flock`. To experiment with that code, run `bin/console` for an interactive prompt.
-
-TODO: Delete this and the text above, and describe your gem
+A reentrant/recursive flock.
 
 ## Installation
 
@@ -22,7 +20,37 @@ Or install it yourself as:
 
 ## Usage
 
-TODO: Write usage instructions here
+```ruby
+require 'reentrant_flock'
+
+File.open('/tmp/lock', File::RDWR | File::CREAT) do |fp|
+  ReentrantFlock.synchronize(fp, File::LOCK_EX) do
+    ReentrantFlock.synchronize(fp, File::LOCK_EX) do
+      # not to be blocked by myself
+    end
+  end
+end
+```
+
+```ruby
+require 'reentrant_flock'
+
+def with_lock(&block)
+  File.open('/tmp/lock', File::RDWR | File::CREAT) do |fp|
+    ReentrantFlock.synchronize(fp, File::LOCK_EX, &block)
+  end
+end
+
+with_lock do
+  with_lock do
+    # not to be blocked by myself
+  end
+end
+```
+
+`ReentrantFlock.synchronize` would raise `ReentrantFlock::AlreadyLocked` if `File::LOCK_NB` is given and already locked by somebody else.
+
+See [File#flock](https://ruby-doc.org/core-2.2.0/File.html#method-i-flock) for flags.
 
 ## Development
 
@@ -32,4 +60,4 @@ To install this gem onto your local machine, run `bundle exec rake install`. To 
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/[USERNAME]/reentrant_flock.
+Bug reports and pull requests are welcome on GitHub at https://github.com/sonots/reentrant_flock.

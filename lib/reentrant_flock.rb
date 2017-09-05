@@ -1,37 +1,145 @@
 require "reentrant_flock/version"
 
 class ReentrantFlock
+  class AlreadyLocked < StandardError; end
+end
+
+class ReentrantFlock
+  class << self
+    # Note that File#flock is automatically unlocked when a file is closed,
+    # but ReentrantFlock.flock cannot automatically reset internal counts
+    # when a file is closed. Use ReentrantFlock.synchronize to assure
+    # decrementing internal counts.
+    #
+    # @param fp [File]
+    # @param operation [PARAM]
+    # @see File#flock for more details
+    # @param [PARAM] operation See File#flock
+    # @return see File#flock
+    def flock(fp, operation)
+      if (operation & File::LOCK_UN) > 0
+        unlock(fp)
+      else
+        lock(fp, operation)
+      end
+    end
+
+    # @param fp [File]
+    # @param [PARAM] operation See File#flock
+    # @yield
+    # @raise [AlreadyLocked] if already locked and LOCK_NB operation is specified
+    # @return [Object] the result of block
+    def synchronize(fp, operation)
+      raise 'Must be called with a block' unless block_given?
+
+      begin
+        raise AlreadyLocked if lock(fp, operation) == false
+        yield
+      ensure
+        unlock(fp)
+      end
+    end
+
+    # @param fp [File]
+    # @return [Boolean] true if locked by self
+    def self_locked?(fp)
+      k = key(fp)
+      Thread.current.key?(k) and Thread.current[k] >= 1
+    end
+
+    private
+
+    # @return [0] if current thread holds the lock
+    # @return [false] if current thread holds the lock
+    def lock(fp, operation)
+      c = incr(key(fp))
+      if c <= 1
+        # flock returns 0 if successfully locked.
+        # LOCK_NB returns false if somebody else already locked
+        fp.flock(operation)
+      else
+        0
+      end
+    end
+
+    def unlock(fp)
+      k = key(fp)
+      c = decr(k)
+      if c <= 0
+        fp.flock(File::LOCK_UN)
+        del(k)
+      end
+    end
+
+    def key(fp)
+      "reentrant_flock_#{fp.path}"
+    end
+
+    def incr(key)
+      Thread.current[key] ||= 0
+      Thread.current[key] += 1
+    end
+
+    def decr(key)
+      Thread.current[key] ||= 0
+      Thread.current[key] -= 1
+    end
+
+    def del(key)
+      Thread.current[key] = nil
+    end
+  end
+end
+
+class ReentrantFlock
   attr_reader :fp
 
   def initialize(fp)
     @fp = fp
-    Thread.current[:reentrant_flock_count] = 0
+    @mutex = Mutex.new
+    @counts = Hash.new(0)
   end
 
+  # @param [PARAM] operation See File#flock
+  # @return see File#flock
+  def flock(operation)
+    if (operation & File::LOCK_UN) > 0
+      unlock
+    else
+      lock(operation)
+    end
+  end
+
+  # @param [PARAM] operation See File#flock
+  # @yield
+  # @raise [AlreadyLocked] if already locked and LOCK_NB operation is specified
+  # @return [Object] the result of block
   def synchronize(operation)
     raise 'Must be called with a block' unless block_given?
 
     begin
-      lock(operation)
+      raise AlreadyLocked if lock(operation) == false
       yield
     ensure
       unlock
     end
   end
 
-  # File::LOCK_EX
-  #   if obtained a lock, return 0
-  #   otherwise, blocked
-  #
-  # File::LOCK_EX | File::LOCK_NB
-  #   if obtained a lock, return 0
-  #   otherwise, return false
+  # @return [Boolean] true if locked by self
+  def self_locked?
+    @mutex.synchronize { @counts[Thread.current] >= 1 }
+  end
+
+  private
+
   def lock(operation)
     c = incr
     if c <= 1
+      # flock returns 0 if successfully locked.
+      # LOCK_NB returns false if somebody else already locked
       fp.flock(operation)
     else
-      (operation & File::LOCK_NB) > 0 ? false : 0
+      0
     end
   end
 
@@ -43,23 +151,15 @@ class ReentrantFlock
     end
   end
 
-  def locked?
-    Thread.current[:reentrant_flock_count] ?
-      Thread.current[:reentrant_flock_count] >= 1 : false
-  end
-
-  private
-
   def incr
-    Thread.current[:reentrant_flock_count] ||= 0
-    Thread.current[:reentrant_flock_count] += 1
+    @mutex.synchronize { @counts[Thread.current] += 1 }
   end
 
   def decr
-    Thread.current[:reentrant_flock_count] -= 1
+    @mutex.synchronize { @counts[Thread.current] -= 1 }
   end
 
   def del
-    Thread.current[:reentrant_flock_count] = nil
+    @mutex.synchronize { @counts.delete(Thread.current) }
   end
 end
