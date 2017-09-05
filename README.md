@@ -26,7 +26,7 @@ require 'reentrant_flock'
 File.open('/tmp/lock', File::RDWR | File::CREAT) do |fp|
   ReentrantFlock.synchronize(fp, File::LOCK_EX) do
     ReentrantFlock.synchronize(fp, File::LOCK_EX) do
-      # not to be blocked by myself
+      # Not blocked by myself
     end
   end
 end
@@ -35,15 +35,15 @@ end
 ```ruby
 require 'reentrant_flock'
 
-def with_lock(&block)
+def with_rlock(&block)
   File.open('/tmp/lock', File::RDWR | File::CREAT) do |fp|
     ReentrantFlock.synchronize(fp, File::LOCK_EX, &block)
   end
 end
 
-with_lock do
-  with_lock do
-    # not to be blocked by myself
+with_rlock do
+  with_rlock do
+    # Not blocked by myself
   end
 end
 ```
