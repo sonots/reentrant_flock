@@ -11,9 +11,7 @@ class ReentrantFlock
     # when a file is closed. Use ReentrantFlock.synchronize to assure
     # decrementing internal counts.
     #
-    # @param fp [File]
-    # @param operation [PARAM]
-    # @see File#flock for more details
+    # @param [File] fp
     # @param [PARAM] operation See File#flock
     # @return see File#flock
     def flock(fp, operation)
