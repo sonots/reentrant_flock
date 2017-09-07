@@ -102,8 +102,8 @@ end
 # That is, File#flock is orginally reentrant for the same file
 # object. On linux, file lock is associated with file descriptor,
 # so another file descriptor is required to get blocked.
-# Below instance version holds a same file object, so may not
-# worth to be prepared. Using flock directly is enough.
+# This version holds the same file object, so might be useless.
+# I may delete this. Using flock directly should be enough.
 class ReentrantFlock
   attr_reader :fp
 
