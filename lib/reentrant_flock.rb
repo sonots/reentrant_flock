@@ -89,7 +89,9 @@ class ReentrantFlock
   end
 end
 
-# Please note that:
+__END__
+# This is the 1st implementation holding a file object within an instance.
+# However, I noticed that File#flock is orginally reentrant for a file object as:
 #
 # ```
 # fp = File.open('a', 'w')
@@ -99,11 +101,9 @@ end
 # fp.flock(File::LOCK_EX) # block
 # ```
 #
-# That is, File#flock is orginally reentrant for the same file
-# object. On linux, file lock is associated with file descriptor,
+# So, this version was just useless.
+# On linux, file lock is associated with file descriptor,
 # so another file descriptor is required to get blocked.
-# This version holds the same file object, so might be useless.
-# I may delete this. Using flock directly should be enough.
 class ReentrantFlock
   attr_reader :fp
 
